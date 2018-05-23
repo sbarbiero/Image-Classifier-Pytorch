@@ -7,4 +7,4 @@ This code is my submission for Udacity's AI Programming with Python Nanodegree. 
   * Run **train.py** to train the classifier
   * Run **predict.py** to use the checkpoint file created by train.py
   * **processimage.py** contains code to normalize an image you wish to pass to predict.py
-  * **network_prep.py** contains all the model loading and configurating modules
+  * **network_prep.py** contains all the model loading and configuration modules
