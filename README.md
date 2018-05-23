@@ -8,3 +8,4 @@ This code is my submission for Udacity's AI Programming with Python Nanodegree. 
   * Run **predict.py** to use the checkpoint file created by train.py
   * **processimage.py** contains code to normalize an image you wish to pass to predict.py
   * **network_prep.py** contains all the model loading and configuration modules
+  * **cat_to_name.json** is an example of a mapping file to utilize with the program
