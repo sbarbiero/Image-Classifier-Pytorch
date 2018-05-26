@@ -4,6 +4,7 @@ from torchvision import models
 from torch.autograd import Variable
 import torch.nn.functional as F
 import json
+import numpy as np
 from network_prep import load_model
 from processimage import process_image
 
@@ -39,7 +40,7 @@ def predict(image, model, top_k, gpu, category_names, arch, class_idx):
     '''
     image = image.unsqueeze(0).float()
     
-    image = Variable(image, volatile=True)
+    image = Variable(image)
     
     if gpu and torch.cuda.is_available():
         model.cuda()
@@ -47,10 +48,10 @@ def predict(image, model, top_k, gpu, category_names, arch, class_idx):
         print('GPU PROCESSING')
     else:
         print('CPU PROCESSING')
-    
-    out = model.forward(image)
-    results = torch.exp(out).data.topk(top_k)
-    classes = results[1][0]
+    with torch.no_grad():
+        out = model.forward(image)
+        results = torch.exp(out).data.topk(top_k)
+    classes = np.array(results[1][0], dtype=np.int)
     probs = Variable(results[0][0]).data
     
     #If category file path passed, convert classes to actual names

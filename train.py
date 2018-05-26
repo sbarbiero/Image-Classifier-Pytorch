@@ -1,6 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 25 17:29:53 2018
+
+@author: sebastian
+"""
+
 import argparse
 import torch
-from torchvision import datasets, transforms, models
 from torch.autograd import Variable
 from network_prep import create_loaders, prep_model, create_classifier
 
@@ -14,8 +21,8 @@ def get_input_args():
             arch - CNN model architecture to use for image classification(default- vgg
                    pick any of the following vgg, densenet, alexnet)
             learning_rate - Learning rate for the CNN(default - 0.001)
-            hidden_units - output sizes for hidden layers, expects comma seperated for the first, and second layers,
-            including output size (default- 4096,2048,102)
+            hidden_units - sizes for hidden layers, expects comma seperated if more than one
+            output_size - output size for data set training on(default-102)
             epochs - defines number of epochs to run(default- 10)
             gpu - turns gpu training on if selected(default- False/off)
         Parameters:
@@ -29,7 +36,8 @@ def get_input_args():
     parser.add_argument('--save_dir', default='', help='Directory to save checkpoint.')
     parser.add_argument('--arch', default='vgg', help='default architecture, options: vgg, densenet, resnet')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='default learning rate' )
-    parser.add_argument('--hidden_units', default='4096,2048,102', type=str, help='default hidden layer sizes')
+    parser.add_argument('--hidden_units', default='512', type=str, help='default hidden layer sizes')
+    parser.add_argument('--output_size', default=102, type=int, help='default output_size')
     parser.add_argument('--epochs', default=10, type=int, help='default training epochs')
     parser.add_argument('--gpu', default=False, action='store_true', help='use GPU processing')
     
@@ -80,7 +88,7 @@ def train_classifier(model, trainloader, validloader, criterion, optimizer, epoc
             loss.backward()
             optimizer.step()
 
-            run_loss += loss.data[0]
+            run_loss += loss.data.item()
             
             #Runs validation forward pass and loop at specified interval
             if steps % print_every == 0:
@@ -90,25 +98,24 @@ def train_classifier(model, trainloader, validloader, criterion, optimizer, epoc
                 valid_loss = 0
 
                 for images, labels in iter(validloader):
-                    images, labels = Variable(images, volatile=True), Variable(labels, volatile=True)
+                    images, labels = Variable(images), Variable(labels)
                     if gpu and torch.cuda.is_available():
                         images, labels = images.cuda(), labels.cuda()
-
-                    out = model.forward(images)
-                    valid_loss += criterion(out, labels).data[0]
-
-                    ps = torch.exp(out).data
-                    equality = (labels.data == ps.max(1)[1])
-
-                    acc += equality.type_as(torch.FloatTensor()).mean()
-
+                    with torch.no_grad():
+                        out = model.forward(images)
+                        valid_loss += criterion(out, labels).data.item()
+        
+                        ps = torch.exp(out).data
+                        equality = (labels.data == ps.max(1)[1])
+        
+                        acc += equality.type_as(torch.FloatTensor()).mean()
+        
                 print("Epoch: {}/{}.. ".format(e+1, epochs),
-                      "Training Loss: {:.3f}.. ".format(run_loss/print_every),
-                      "Valid Loss: {:.3f}.. ".format(valid_loss/len(validloader)),
-                      "Valid Accuracy: {:.3f}".format(acc/len(validloader)))  
-
+                 "Training Loss: {:.3f}.. ".format(run_loss/print_every),
+                  "Valid Loss: {:.3f}.. ".format(valid_loss/len(validloader)),
+                  "Valid Accuracy: {:.3f}".format(acc/len(validloader)))  
+    
                 run_loss = 0
-
                 model.train()
             
     print('{} EPOCHS COMPLETE. MODEL TRAINED.'.format(epochs))
@@ -140,23 +147,23 @@ def test_classifier(model, testloader, criterion, gpu):
     test_loss = 0
     #Forward pass
     for images, labels in iter(testloader):
-        images, labels = Variable(images, volatile=True), Variable(labels, volatile=True)
+        images, labels = Variable(images), Variable(labels)
         if gpu and torch.cuda.is_available():
             images, labels = images.cuda(), labels.cuda()
+        with torch.no_grad():
+            out = model.forward(images)
+            test_loss += criterion(out, labels).data.item()
 
-        out = model.forward(images)
-        test_loss += criterion(out, labels).data[0]
+            ps = torch.exp(out).data
+            equality = (labels.data == ps.max(1)[1])
 
-        ps = torch.exp(out).data
-        equality = (labels.data == ps.max(1)[1])
-
-        acc += equality.type_as(torch.FloatTensor()).mean()
+            acc += equality.type_as(torch.FloatTensor()).mean()
 
     print("Test Loss: {:.3f}.. ".format(test_loss/len(testloader)),
           "Test Accuracy: {:.3f}".format(acc/len(testloader)))
     pass
 
-def save_model_checkpoint(model, input_size, epochs, save_dir, arch, learning_rate, class_idx, optimizer):
+def save_model_checkpoint(model, input_size, epochs, save_dir, arch, learning_rate, class_idx, optimizer, output_size):
     """
     Saves the trained and tested module by outputting a checkpoint file.
     Parameters:
@@ -173,6 +180,7 @@ def save_model_checkpoint(model, input_size, epochs, save_dir, arch, learning_ra
     'epochs':epochs,
     'arch':arch,
     'hidden_units':[each.out_features for each in model.classifier if hasattr(each, 'out_features') == True],
+    'output_size': output_size,
     'learning_rate': learning_rate,
     'class_to_idx': class_idx,
     'optimizer_dict': optimizer.state_dict(),
@@ -192,10 +200,10 @@ def main():
     in_args = get_input_args()
     trainloader, testloader, validloader, class_idx = create_loaders(in_args.data_dir)
     model, input_size = prep_model(in_args.arch)
-    model, criterion, optimizer = create_classifier(model, input_size, in_args.hidden_units, in_args.learning_rate)
+    model, criterion, optimizer = create_classifier(model, input_size, in_args.hidden_units, in_args.output_size, in_args.learning_rate)
     trained_model = train_classifier(model, trainloader, validloader, criterion, optimizer, in_args.epochs, in_args.gpu)
     test_classifier(trained_model, testloader, criterion, in_args.gpu)
-    save_model_checkpoint(trained_model, input_size, in_args.epochs, in_args.save_dir, in_args.arch, in_args.learning_rate, class_idx, optimizer)
+    save_model_checkpoint(trained_model, input_size, in_args.epochs, in_args.save_dir, in_args.arch, in_args.learning_rate, class_idx, optimizer, in_args.output_size)
     pass
 
 if __name__ == '__main__':
