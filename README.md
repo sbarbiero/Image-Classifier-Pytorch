@@ -2,7 +2,8 @@
 
 This code is my submission for Udacity's AI Programming with Python Nanodegree. In this project, I created a command line application utilizing Pytorch, Neural Networks and Transfer Learning to train a new classifier on top of a pre-existing model trained on ImageNet to identify between 102 different types of flowers.
 
-_This program can be modified to train itself on many different image classification problems if the proper arguments are passed._
+_This program can be modified to train itself on many different image classification problems if the proper arguments are passed.
+Please read the comment comments to get information on arguments and how to use the programs._
 
 ## Use the program
 Run **Pytorch 0.4.0**
